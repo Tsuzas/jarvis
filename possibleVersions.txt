@@ -1,0 +1,26 @@
+
+
+v1
+push to talk
+AI answers
+voice output
+if necessary ⤵
+            memory
+
+v2
+wake word
+desktop overlay
+personality tuning
+local knowledge
+
+v3
+screenshot vision
+“what am I looking at?”
+OCR reading
+game assistance
+
+v4
+app control
+browser tools
+automation
+
