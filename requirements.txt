@@ -4,7 +4,10 @@ edge_tts
 keyboard
 ollama
 faster-whisper
+openwakeword
 
 # py -3.11 -m venv venv
 # venv\Scripts\activate
-# pip install pyaudio pygame edge_tts keyboard ollama faster-whisper
+# pip install -r requirements.txt
+# OR    
+# pip install pyaudio pygame edge_tts keyboard ollama faster-whisper openwakeword
