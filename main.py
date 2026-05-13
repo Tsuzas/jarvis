@@ -2,19 +2,23 @@ import os
 import re
 import time
 import wave
-import numpy as np
 import pygame
 import pyaudio
 import asyncio
 import edge_tts
-import keyboard
+import webrtcvad
+import numpy as np
 import openwakeword
 from openwakeword.model import Model
 from ollama import chat
 from faster_whisper import WhisperModel
 
-## Download models on first run
+# Download models on first run 
 openwakeword.utils.download_models()
+
+# VAD aggressiveness 0-3
+vad = webrtcvad.Vad(2)
+CHUNK = 480
 
 async def bootAudio():
     import random
@@ -59,10 +63,43 @@ async def speak(text):
     pygame.mixer.music.unload()
     os.remove("output.mp3")
 
+def is_loud_enough(frame, threshold=1000):
+    audio = np.frombuffer(frame, dtype=np.int16)
+    return np.abs(audio).mean() > threshold
+
+def record_until_silence(stream):
+    frames = []
+    silent_chunks = 0
+    SILENCE_LIMIT = 30  # ~1.5 sec of silence to stop
+
+    print("Listening...")
+    started_speaking = False
+
+    while True:
+        data = stream.read(CHUNK, exception_on_overflow=False)
+
+        is_speech = vad.is_speech(data, sample_rate=16000) 
+
+        if is_speech:
+            frames.append(data)
+            silent_chunks = 0
+            started_speaking = True
+        else:
+            # só conta silêncio depois de começar a falar
+            if started_speaking:
+                silent_chunks += 1
+
+        if started_speaking and silent_chunks > SILENCE_LIMIT:
+            print("Silence detected, processing...")
+            break
+            
+    return frames
+
 ## SETUP
 os.environ["PATH"] += os.pathsep + r"C:\ffmpeg\bin"
 pygame.mixer.init()
 
+STATE = "WAKE"
 OUTPUT_FILENAME = "recordedAudio.wav"
 EXIT_KEYWORDS = ["goodbye", "bye", "exit", "quit", "stop", "see you", "take care", "farewell", "later", "peace", "close"]
 SYSTEM_PROMPT = (
@@ -77,15 +114,15 @@ SYSTEM_PROMPT = (
     "If the user says goodbye or anything that signals they want to end the conversation, reply with only one short farewell word or phrase, nothing else. Examples: 'Goodbye.', 'Take care.', 'See you.'"
 )
 
-## OPENWAKEWORD + PYAUDIO SETUP
+## OPENWAKEWORD + PYAUDIO + WHISPER SETUP
 oww_model = Model(wakeword_models=["hey_jarvis"], inference_framework="onnx")
-model = WhisperModel("base", device="cpu", compute_type="int8")
-  
+whisper_model = WhisperModel("base", device="cpu", compute_type="int8")
+
 audio = pyaudio.PyAudio()
 stream = audio.open(
     format=pyaudio.paInt16,
     channels=1,
-    rate=16000,  # openwakeword requires 16000
+    rate=16000,
     input=True,
     frames_per_buffer=1280,
     input_device_index=4
@@ -96,63 +133,65 @@ print("Listening for 'Hey Jarvis'...")
 
 try:
     while True:
-        # WAKE WORD LOOP
-        raw = stream.read(1280, exception_on_overflow=False)
-        pcm = np.frombuffer(raw, dtype=np.int16)
-        prediction = oww_model.predict(pcm)
 
-        if prediction["hey_jarvis"] > 0.5:
-            print("Hey Jarvis detected!")
-            asyncio.run(bootAudio())
+        if STATE == "WAKE":
+            raw = stream.read(320, exception_on_overflow=False)
+            pcm = np.frombuffer(raw, dtype=np.int16)
+            prediction = oww_model.predict(pcm)
+            time.sleep(0.02) 
+            if prediction["hey_jarvis"] > 0.5:
+                print("Hey Jarvis detected!")
+                oww_model.reset()
 
-            # CONVERSATION LOOP
-            while True:
-                frames = []
-                print("Press SPACE to start recording")
-                keyboard.wait('space')
-                print("Recording... Press SPACE to stop.")
-                time.sleep(0.2)
+                STATE = "LISTEN"
+                asyncio.run(bootAudio())
 
-                while True:
-                    try:
-                        data = stream.read(1280, exception_on_overflow=False)
-                        frames.append(data)
-                    except OSError:
-                        pass
-                    if keyboard.is_pressed('space'):
-                        print("Stopping recording.")
-                        time.sleep(0.2)
-                        break
 
-                wf = wave.open(OUTPUT_FILENAME, 'wb')
-                wf.setnchannels(1)
-                wf.setsampwidth(audio.get_sample_size(pyaudio.paInt16))
-                wf.setframerate(16000)
-                wf.writeframes(b''.join(frames))
-                wf.close()
+        elif STATE == "LISTEN":
+            frames = record_until_silence(stream)
 
-                
-                segments, _ = model.transcribe(OUTPUT_FILENAME)
-                prompt = " ".join(s.text for s in segments)
-                print("\nYou said:", prompt)
+            #if not frames or len(frames) < 10:
+            #    print("Ignored audio")
+            #    STATE = "LISTEN"
+            #    continue
 
-                aiResponse = chat(
-                    model='mistral:7b',
-                    messages=[
-                        {'role': 'system', 'content': SYSTEM_PROMPT},
-                        {'role': 'user', 'content': prompt}
-                    ]
-                )
+            audio_bytes = b"".join(frames)
 
-                response_text = aiResponse['message']['content']
-                print("Jarvis:", response_text)
+            wf = wave.open(OUTPUT_FILENAME, 'wb')
+            wf.setnchannels(1)
+            wf.setsampwidth(audio.get_sample_size(pyaudio.paInt16))
+            wf.setframerate(16000)
+            wf.writeframes(audio_bytes)
+            wf.close()
 
-                cleaned_text = clean_for_tts(response_text)
-                asyncio.run(speak(cleaned_text))
+            STATE = "PROCESS"
 
-                if any(word in prompt.lower() for word in EXIT_KEYWORDS):
-                    print("\n------------------------\nReturning to wake word detection...\n------------------------")
-                    break  # back to wake word loop, not full exit
+
+        elif STATE == "PROCESS":
+            segments, _ = whisper_model.transcribe(OUTPUT_FILENAME)
+            prompt = " ".join(s.text for s in segments)
+            print("\nYou said:", prompt)
+
+            aiResponse = chat(
+                model='mistral:7b',
+                messages=[
+                    {'role': 'system', 'content': SYSTEM_PROMPT},
+                    {'role': 'user', 'content': prompt}
+                ]
+            )
+
+            response_text = aiResponse['message']['content']
+            print("Jarvis:", response_text)
+
+            cleaned_text = clean_for_tts(response_text)
+            asyncio.run(speak(cleaned_text))
+            STATE = "LISTEN"
+
+            if any(word in prompt.lower() for word in EXIT_KEYWORDS):
+                print("Returning to wake word detection...")
+                STATE = "WAKE"
+            else:
+                STATE = "WAKE"
 
 finally:
     stream.stop_stream()
