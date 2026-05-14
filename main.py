@@ -122,18 +122,28 @@ APPS = {
     "steam": r"C:\Users\fpere\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Steam\Steam.lnk"
 }
 EXIT_KEYWORDS = ["goodbye", "bye", "exit", "quit", "stop", "see you", "take care", "farewell", "close"]
-SYSTEM_PROMPT = (
-    "You are a fast conversational assistant.\n"
-    "Use natural human friendly tone.\n"
-    "You are a voice assistant. You are being spoken to, not typed at.\n"
-    "Reply in 1-3 sentences max unless the user explicitly asks for more.\n"
-    "Be direct and conversational, like a knowledgeable friend.\n"
-    "No bullet points, no lists, no markdown — plain spoken language only.\n"
-    "No emojis.\n"
-    "Always answer in English.\n"
-    "If the user says goodbye or anything that signals they want to end the conversation, reply with only one short farewell word or phrase, nothing else. Examples: 'Goodbye.', 'Take care.', 'See you.'"
-    "If User ask to open something, simply answer:'Opening (thing)...' "
-    "If User tells to Clip something, simply answer: Clipped!"
+SYSTEM_PROMPT = ("""
+You are a fast conversational voice assistant.
+
+Use a natural, human-friendly tone.
+Keep replies short and conversational.
+Reply in 1-3 sentences unless the user asks for more.
+
+You are being spoken to, not typed to.
+Avoid markdown, bullet points, lists, and emojis.
+
+Always reply in English.
+
+If the user clearly ends the conversation, reply with only a short farewell.
+
+If the user requests an application, website, or file to be opened, reply only:
+'Opening <thing>...'
+
+If the user requests something to be clipped or captured, reply only:
+'Clipped!' variants.
+
+If the user request for the screen to be shared, reply only: 'On it' or 'Enabling Screen Share' variants.
+"""
 )
 
 ## OPENWAKEWORD + PYAUDIO + WHISPER SETUP
@@ -216,6 +226,7 @@ try:
             loop.run_until_complete(speak(cleaned_text))
             STATE = "WAKE"
         
+            # OPENS APPS in the APP LIST
             if "open" in prompt.lower():
                 for app in APPS:
                     if app in prompt.lower():
@@ -223,21 +234,16 @@ try:
                         os.startfile(APPS[app])
                         STATE = "WAKE"
                         continue
-
+                        
+            # KeyPress LALT + F10 activating Nvidia Shadowplay
             if "clip" in prompt.lower() and "this" in prompt.lower():
-                keyboard.press('left_alt')  # Press Left Alt
-                keyboard.press('f10')  # Press F10
-                keyboard.release('left_alt') # releases respective
-                keyboard.release('f10') # releases respective
+                keyboard.send("left_alt + f10")
 
+            # Keypress LSHIFT+L+P enabling ScreenShare (only is games where Discord sees)
             if "screen" in prompt.lower() and "share" in prompt.lower():
-                keyboard.press('left_shift')  # Press Left Shift
-                keyboard.press('l')  # Press F10
-                keyboard.press('p')
-                keyboard.release('left_shift') # releases respective
-                keyboard.release('f10') # releases respective
-                keyboard.release('p')
+                keyboard.send('shift+l+p')
 
+            # RETURN TO CONSOLE IF WORDS IN PROMPT (KINDA USELESS FOR NOW SINCE IM THINKING ON GOING ALWAYS TO ACTIVATE FOR NEXT INPUT)
             if any(word in prompt.lower() for word in EXIT_KEYWORDS):
                 print("Returning to wake word detection...")
                 STATE = "WAKE"
