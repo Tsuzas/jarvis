@@ -17,7 +17,7 @@ from faster_whisper import WhisperModel
 openwakeword.utils.download_models()
 
 # VAD aggressiveness 0-3
-vad = webrtcvad.Vad(2)
+vad = webrtcvad.Vad(3)
 CHUNK = 480
 
 async def bootAudio():
@@ -203,21 +203,18 @@ try:
             cleaned_text = clean_for_tts(response_text)
             asyncio.run(speak(cleaned_text))
             STATE = "LISTEN"
-
+        
+            if "open" in prompt.lower():
+                for app in APPS:
+                    if app in prompt.lower():
+                        print(f"Opening {app}...")
+                        os.startfile(APPS[app])
+                        STATE = "WAKE"
+                        continue
+                    
             if any(word in prompt.lower() for word in EXIT_KEYWORDS):
                 print("Returning to wake word detection...")
                 STATE = "WAKE"
-
-            #if any(word in prompt.lower() for word in OPEN_WORDS):
-            #        print(f"Opening {word}...")
-            #        os.startfile(f"{word}.exe")
-            #        STATE = "WAKE"
-            for app in APPS:
-                if app in prompt.lower():
-                    print(f"Opening {app}...")
-                    os.startfile(APPS[app])
-                    STATE = "WAKE"
-                    break
         else:
             STATE = "WAKE"
 
