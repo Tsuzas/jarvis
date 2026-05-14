@@ -223,11 +223,20 @@ try:
                         os.startfile(APPS[app])
                         STATE = "WAKE"
                         continue
+
             if "clip" in prompt.lower() and "this" in prompt.lower():
                 keyboard.press('left_alt')  # Press Left Alt
                 keyboard.press('f10')  # Press F10
                 keyboard.release('left_alt') # releases respective
                 keyboard.release('f10') # releases respective
+
+            if "screen" in prompt.lower() and "share" in prompt.lower():
+                keyboard.press('left_shift')  # Press Left Shift
+                keyboard.press('l')  # Press F10
+                keyboard.press('p')
+                keyboard.release('left_shift') # releases respective
+                keyboard.release('f10') # releases respective
+                keyboard.release('p')
 
             if any(word in prompt.lower() for word in EXIT_KEYWORDS):
                 print("Returning to wake word detection...")
