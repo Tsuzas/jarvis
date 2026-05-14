@@ -9,8 +9,8 @@ import edge_tts
 import webrtcvad
 import numpy as np
 import openwakeword
-from openwakeword.model import Model
 from ollama import chat
+from openwakeword.model import Model
 from faster_whisper import WhisperModel
 
 # Download models on first run 
@@ -19,25 +19,30 @@ openwakeword.utils.download_models()
 # VAD aggressiveness 0-3
 vad = webrtcvad.Vad(3)
 CHUNK = 480
+first_boot= True
 
-async def bootAudio():
+async def bootAudio(first_boot):
     import random
-    GREETINGS = [
-        "Ready.", "Listening.", "Online.", "Awaiting input.", "Standing by.",
-        "How can I help?", "Voice input active.", "Systems operational.",
+    GREETINGS = ["How can I help?", "Voice input active.", "Systems operational.",
         "Assistant ready.", "What do you need?", "Connected.",
-        "Ready for commands.", "Input detected.", "Session started.",
-        "Microphone active.", "Processing.", "Command ready.", "I'm here.",
-        "Initialized.", "Operational.",
+        "Ready for commands.", "Session started.",
+        "Microphone active.", "Processing.", "Command ready.",
         "Good evening. I've lowered my expectations appropriately.",
         "I exist purely because typing is annoying.",
         "Systems online. Standards offline.", "Fantastic. More debugging.",
-        "I assume we're doing something unnecessary but interesting.",
-        "Back again? Damn...", "Voice systems active.",
+        "I assume we're doing something unnecessary but interesting.","Voice systems active.",
         "Welcome back. What are we working on today?", "Ready when you are.",
         "Hey. What can I do for you?", "Welcome back. What code are we breaking today?"
     ]
-    greeting = random.choice(GREETINGS)
+    REGREETS = ["Ready.", "Operational.", "I'm here.", "Back again?",
+                "Online.", "Listening.", "Awaiting input.",
+                "Standing by.", "Input detected.", "Initialized."
+    ]
+    
+    if first_boot:
+        greeting = random.choice(GREETINGS)
+    else:
+        greeting = random.choice(REGREETS)
     print(greeting)
     communicate = edge_tts.Communicate(greeting, "en-GB-RyanNeural", rate="+40%")
     await communicate.save("BootAudio.mp3")
@@ -65,9 +70,10 @@ async def speak(text):
     pygame.mixer.music.unload()
     os.remove("output.mp3")
 
-def is_loud_enough(frame, threshold=1000):
-    audio = np.frombuffer(frame, dtype=np.int16)
-    return np.abs(audio).mean() > threshold
+# POSSIBILY IMPLEMENTED IN THE FUTURE
+#def is_loud_enough(frame, threshold=1000):
+#    audio = np.frombuffer(frame, dtype=np.int16)
+#    return np.abs(audio).mean() > threshold
 
 def record_until_silence(stream):
     frames = []
@@ -111,7 +117,6 @@ APPS = {
     "steam": r"C:\Users\fpere\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Steam\Steam.lnk"
 }
 EXIT_KEYWORDS = ["goodbye", "bye", "exit", "quit", "stop", "see you", "take care", "farewell", "later", "peace", "close"]
-TERMINATE_kEYWORDS =["","",""]
 SYSTEM_PROMPT = (
     "You are a fast conversational assistant.\n"
     "Use natural human friendly tone.\n"
@@ -139,7 +144,7 @@ stream = audio.open(
     input_device_index=4
 )
 
-asyncio.run(bootAudio())
+asyncio.run(bootAudio(first_boot=True))
 print("Listening for 'Hey Jarvis'...")
 
 try:
@@ -155,7 +160,7 @@ try:
                 oww_model.reset()
 
                 STATE = "LISTEN"
-                asyncio.run(bootAudio())
+                asyncio.run(bootAudio(first_boot=False))
 
 
         elif STATE == "LISTEN":
@@ -211,7 +216,7 @@ try:
                         os.startfile(APPS[app])
                         STATE = "WAKE"
                         continue
-                    
+
             if any(word in prompt.lower() for word in EXIT_KEYWORDS):
                 print("Returning to wake word detection...")
                 STATE = "WAKE"
