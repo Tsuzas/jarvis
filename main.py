@@ -48,9 +48,11 @@ async def bootAudio():
     pygame.mixer.music.unload()
 
 def clean_for_tts(text):
+
     text = re.sub(r"```.*?```", "Code example available in console.", text, flags=re.DOTALL)
     text = re.sub(r"`(.*?)`", r"\1", text)
     text = re.sub(r"https?://\S+", "link omitted.", text)
+    
     return text
 
 async def speak(text):
@@ -78,21 +80,23 @@ def record_until_silence(stream):
     while True:
         data = stream.read(CHUNK, exception_on_overflow=False)
 
-        is_speech = vad.is_speech(data, sample_rate=16000) 
+        is_speech = vad.is_speech(data, sample_rate=16000)
 
         if is_speech:
-            frames.append(data)
-            silent_chunks = 0
             started_speaking = True
+            silent_chunks = 0
         else:
-            # só conta silêncio depois de começar a falar
             if started_speaking:
                 silent_chunks += 1
+
+        # keep recording after user starts talking
+        if started_speaking:
+            frames.append(data)
 
         if started_speaking and silent_chunks > SILENCE_LIMIT:
             print("Silence detected, processing...")
             break
-            
+                
     return frames
 
 ## SETUP
@@ -101,7 +105,13 @@ pygame.mixer.init()
 
 STATE = "WAKE"
 OUTPUT_FILENAME = "recordedAudio.wav"
+APPS = {
+    "brave": r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Brave.lnk",
+    "code": r"C:\Users\fpere\Desktop\Code - Shortcut.lnk",
+    "steam": r"C:\Users\fpere\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Steam\Steam.lnk"
+}
 EXIT_KEYWORDS = ["goodbye", "bye", "exit", "quit", "stop", "see you", "take care", "farewell", "later", "peace", "close"]
+TERMINATE_kEYWORDS =["","",""]
 SYSTEM_PROMPT = (
     "You are a fast conversational assistant.\n"
     "Use natural human friendly tone.\n"
@@ -112,6 +122,7 @@ SYSTEM_PROMPT = (
     "No emojis.\n"
     "Always answer in English.\n"
     "If the user says goodbye or anything that signals they want to end the conversation, reply with only one short farewell word or phrase, nothing else. Examples: 'Goodbye.', 'Take care.', 'See you.'"
+    "If User ask to open something, simply answer:'Opening (thing)...' "
 )
 
 ## OPENWAKEWORD + PYAUDIO + WHISPER SETUP
@@ -150,10 +161,10 @@ try:
         elif STATE == "LISTEN":
             frames = record_until_silence(stream)
 
-            #if not frames or len(frames) < 10:
-            #    print("Ignored audio")
-            #    STATE = "LISTEN"
-            #    continue
+            if not frames or len(frames) < 15:
+                print("Ignored audio")
+                STATE = "LISTEN"
+                continue
 
             audio_bytes = b"".join(frames)
 
@@ -170,8 +181,14 @@ try:
         elif STATE == "PROCESS":
             segments, _ = whisper_model.transcribe(OUTPUT_FILENAME)
             prompt = " ".join(s.text for s in segments)
-            print("\nYou said:", prompt)
+            prompt = prompt.strip()
 
+            if not prompt:
+                print("Empty transcription ignored")
+                STATE = "LISTEN"
+                continue
+            print("\nYou said:", prompt)
+            
             aiResponse = chat(
                 model='mistral:7b',
                 messages=[
@@ -190,8 +207,19 @@ try:
             if any(word in prompt.lower() for word in EXIT_KEYWORDS):
                 print("Returning to wake word detection...")
                 STATE = "WAKE"
-            else:
-                STATE = "WAKE"
+
+            #if any(word in prompt.lower() for word in OPEN_WORDS):
+            #        print(f"Opening {word}...")
+            #        os.startfile(f"{word}.exe")
+            #        STATE = "WAKE"
+            for app in APPS:
+                if app in prompt.lower():
+                    print(f"Opening {app}...")
+                    os.startfile(APPS[app])
+                    STATE = "WAKE"
+                    break
+        else:
+            STATE = "WAKE"
 
 finally:
     stream.stop_stream()
