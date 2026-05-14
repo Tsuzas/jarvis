@@ -1,3 +1,5 @@
+##ADICIONAR JARVIS CLIPS THIS QUE DA PROC AO NVIDIA F10
+## VER COMO E QUE SCREENSHARE NO DISCORD FUNCIONARIA
 import os
 import re
 import time
@@ -5,6 +7,7 @@ import wave
 import pygame
 import pyaudio
 import asyncio
+import keyboard
 import edge_tts
 import webrtcvad
 import numpy as np
@@ -118,7 +121,7 @@ APPS = {
     "code": r"C:\Users\fpere\Desktop\Code - Shortcut.lnk",
     "steam": r"C:\Users\fpere\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Steam\Steam.lnk"
 }
-EXIT_KEYWORDS = ["goodbye", "bye", "exit", "quit", "stop", "see you", "take care", "farewell", "later", "peace", "close"]
+EXIT_KEYWORDS = ["goodbye", "bye", "exit", "quit", "stop", "see you", "take care", "farewell", "close"]
 SYSTEM_PROMPT = (
     "You are a fast conversational assistant.\n"
     "Use natural human friendly tone.\n"
@@ -130,6 +133,7 @@ SYSTEM_PROMPT = (
     "Always answer in English.\n"
     "If the user says goodbye or anything that signals they want to end the conversation, reply with only one short farewell word or phrase, nothing else. Examples: 'Goodbye.', 'Take care.', 'See you.'"
     "If User ask to open something, simply answer:'Opening (thing)...' "
+    "If User tells to Clip something, simply answer: Clipped!"
 )
 
 ## OPENWAKEWORD + PYAUDIO + WHISPER SETUP
@@ -210,7 +214,7 @@ try:
             cleaned_text = clean_for_tts(response_text)
             #CLEANSED TEXT TTS'ed
             loop.run_until_complete(speak(cleaned_text))
-            STATE = "LISTEN"
+            STATE = "WAKE"
         
             if "open" in prompt.lower():
                 for app in APPS:
@@ -219,6 +223,11 @@ try:
                         os.startfile(APPS[app])
                         STATE = "WAKE"
                         continue
+            if "clip" in prompt.lower() and "this" in prompt.lower():
+                keyboard.press('left_alt')  # Press Left Alt
+                keyboard.press('f10')  # Press F10
+                keyboard.release('left_alt') # releases respective
+                keyboard.release('f10') # releases respective
 
             if any(word in prompt.lower() for word in EXIT_KEYWORDS):
                 print("Returning to wake word detection...")
