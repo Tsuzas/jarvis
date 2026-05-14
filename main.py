@@ -108,6 +108,8 @@ def record_until_silence(stream):
 ## SETUP
 os.environ["PATH"] += os.pathsep + r"C:\ffmpeg\bin"
 pygame.mixer.init()
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
 
 STATE = "WAKE"
 OUTPUT_FILENAME = "recordedAudio.wav"
@@ -140,18 +142,18 @@ stream = audio.open(
     channels=1,
     rate=16000,
     input=True,
-    frames_per_buffer=1280,
+    frames_per_buffer= CHUNK,
     input_device_index=4
 )
 
-asyncio.run(bootAudio(first_boot=True))
+loop.run_until_complete(bootAudio(first_boot=True))
 print("Listening for 'Hey Jarvis'...")
 
 try:
     while True:
 
         if STATE == "WAKE":
-            raw = stream.read(320, exception_on_overflow=False)
+            raw = stream.read(CHUNK, exception_on_overflow=False)
             pcm = np.frombuffer(raw, dtype=np.int16)
             prediction = oww_model.predict(pcm)
             time.sleep(0.02) 
@@ -160,7 +162,7 @@ try:
                 oww_model.reset()
 
                 STATE = "LISTEN"
-                asyncio.run(bootAudio(first_boot=False))
+                loop.run_until_complete(bootAudio(first_boot=False))
 
 
         elif STATE == "LISTEN":
@@ -206,7 +208,8 @@ try:
             print("Jarvis:", response_text)
 
             cleaned_text = clean_for_tts(response_text)
-            asyncio.run(speak(cleaned_text))
+            #CLEANSED TEXT TTS'ed
+            loop.run_until_complete(speak(cleaned_text))
             STATE = "LISTEN"
         
             if "open" in prompt.lower():
@@ -227,3 +230,4 @@ finally:
     stream.stop_stream()
     stream.close()
     audio.terminate()
+    loop.close()
