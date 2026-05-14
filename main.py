@@ -148,7 +148,7 @@ If the user request for the screen to be shared, reply only: 'On it' or 'Enablin
 
 ## OPENWAKEWORD + PYAUDIO + WHISPER SETUP
 oww_model = Model(wakeword_models=["hey_jarvis"], inference_framework="onnx")
-whisper_model = WhisperModel("base", device="cpu", compute_type="int8")
+whisper_model = WhisperModel("base.en", device="cpu", compute_type="int8")
 
 audio = pyaudio.PyAudio()
 stream = audio.open(
@@ -180,6 +180,7 @@ try:
 
 
         elif STATE == "LISTEN":
+            pygame.mixer.Sound("audio/Palumm.mp3").play()
             frames = record_until_silence(stream)
 
             if not frames or len(frames) < 15:
