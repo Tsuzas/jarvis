@@ -3,6 +3,7 @@ import os
 import re
 import time
 import wave
+import json
 import pygame
 import pyaudio
 import asyncio
@@ -130,73 +131,6 @@ async def speak(text):
 def create_tray_icon():
     import pystray
 
-    def on_quit(icon, item):
-        icon.stop()
-        os._exit(0)
-
-    def open_menu(icon, item):
-        def launch():
-            settings = tk.Toplevel()
-            settings.title("Jarvis Settings")
-            settings.geometry("500x400")
-            settings.resizable(False, False)
-            settings.attributes("-topmost", True)
-
-            tk.Label(settings, text="Jarvis Assistant", font=("Arial", 14, "bold")).pack(pady=10)
-            tk.Label(settings, text="App Name       |       App Path").pack()
-
-            rows = []  # stores (name_entry, path_entry) per row
-
-            frame = tk.Frame(settings)
-            frame.pack(pady=5)
-
-            def add_row(name="", path=""):
-                row_frame = tk.Frame(frame)
-                row_frame.pack(pady=2)
-
-                name_entry = tk.Entry(row_frame, width=12)
-                name_entry.insert(0, name)
-                name_entry.pack(side="left", padx=5)
-
-                path_entry = tk.Entry(row_frame, width=40)
-                path_entry.insert(0, path)
-                path_entry.pack(side="left", padx=5)
-
-                rows.append((name_entry, path_entry))
-
-                # When user types in the last empty row, add a new empty one
-                def on_type(event):
-                    if rows and rows[-1] == (name_entry, path_entry):
-                        if name_entry.get().strip() or path_entry.get().strip():
-                            add_row()
-
-                name_entry.bind("<KeyRelease>", on_type)
-                path_entry.bind("<KeyRelease>", on_type)
-
-            # Populate existing apps
-            for app_name, app_path in APPS.items():
-                add_row(app_name, app_path)
-
-            # Extra empty row at the end
-            add_row()
-
-            def save():
-                APPS.clear()
-                for name_entry, path_entry in rows:
-                    name = name_entry.get().strip()
-                    path = path_entry.get().strip()
-                    if name and path:  # skip empty rows
-                        APPS[name] = path
-                print("APPS updated:", APPS)
-                settings.destroy()
-
-            tk.Button(settings, text="Save", width=20, command=save).pack(pady=10)
-            tk.Button(settings, text="Close", width=20, command=settings.destroy).pack()
-    
-            settings.mainloop()
-
-        threading.Thread(target=launch, daemon=True).start()
-
     image = Image.open("media/tray_icon.png")
     menu = pystray.Menu(
         pystray.MenuItem("Settings", open_menu),
@@ -204,7 +138,75 @@ def create_tray_icon():
     )
     icon = pystray.Icon("Jarvis", image, "Jarvis Assistant", menu)
     threading.Thread(target=icon.run, daemon=True).start()
-    
+
+def on_quit(icon, item):
+        icon.stop()
+        os._exit(0)
+def open_menu(icon, item):
+
+    def launch():
+        settings = tk.Toplevel()
+        settings.title("Jarvis Settings")
+        settings.geometry("500x400")
+        settings.resizable(False, False)
+        settings.attributes("-topmost", True)
+
+        tk.Label(settings, text="Jarvis Assistant", font=("Arial", 14, "bold")).pack(pady=10)
+        tk.Label(settings, text="App Name       |       App Path").pack()
+
+        rows = []  # stores (name_entry, path_entry) per row
+
+        frame = tk.Frame(settings)
+        frame.pack(pady=5)
+
+        def add_row(name="", path=""):
+            row_frame = tk.Frame(frame)
+            row_frame.pack(pady=2)
+
+            name_entry = tk.Entry(row_frame, width=12)
+            name_entry.insert(0, name)
+            name_entry.pack(side="left", padx=5)
+
+            path_entry = tk.Entry(row_frame, width=40)
+            path_entry.insert(0, path)
+            path_entry.pack(side="left", padx=5)
+
+            rows.append((name_entry, path_entry))
+
+            # When user types in the last empty row, add a new empty one
+            def on_type(event):
+                if rows and rows[-1] == (name_entry, path_entry):
+                    if name_entry.get().strip() or path_entry.get().strip():
+                        add_row()
+
+            name_entry.bind("<KeyRelease>", on_type)
+            path_entry.bind("<KeyRelease>", on_type)
+
+        # Populate existing apps
+        for app_name, app_path in APPS.items():
+            add_row(app_name, app_path)
+
+        # Extra empty row at the end
+        add_row()
+
+        def save():
+            APPS.clear()
+            for name_entry, path_entry in rows:
+                name = name_entry.get().strip()
+                path = path_entry.get().strip()
+                if name and path:  # skip empty rows
+                    APPS[name] = path
+            print("APPS updated:", APPS)
+            settings.destroy()
+
+        tk.Button(settings, text="Save", width=20, command=save).pack(pady=10)
+        tk.Button(settings, text="Close", width=20, command=settings.destroy).pack()
+
+        settings.mainloop()
+
+    threading.Thread(target=launch, daemon=True).start()    
+
+
 # POSSIBILY IMPLEMENTED IN THE FUTURE
 #def is_loud_enough(frame, threshold=1000):
 #    audio = np.frombuffer(frame, dtype=np.int16)
@@ -279,7 +281,25 @@ If the user requests something to be clipped or captured, reply only:
 If the user request for the screen to be shared, reply only: 'On it' or 'Enabling Screen Share' variants.
 """
 )
+INTENT_PROMPT = """
+You are an intent classifier for a voice assistant.
 
+Given a user message, return ONLY a JSON object like this:
+{
+  "action": "open_app" | "clip" | "screen_share" | "open_settings" | "exit" | "none",
+  "target": "app name or null"
+}
+
+Examples:
+"open brave" -> {"action": "open_app", "target": "brave"}
+"clip that" -> {"action": "clip", "target": null}
+"share my screen" -> {"action": "screen_share", "target": null}
+"open settings" -> {"action": "open_settings", "target": null}
+"goodbye" -> {"action": "exit", "target": null}
+"what is the weather" -> {"action": "none", "target": null}
+
+Return ONLY the JSON. No explanation. No markdown.
+"""
 ## OPENWAKEWORD + PYAUDIO + WHISPER SETUP
 oww_model = Model(wakeword_models=["hey_jarvis"], inference_framework="onnx")
 whisper_model = WhisperModel("base.en", device="cpu", compute_type="int8")
@@ -361,31 +381,67 @@ try:
             cleaned_text = clean_for_tts(response_text)
             #CLEANSED TEXT TTS'ed
             loop.run_until_complete(speak(cleaned_text))
+            # second call - intent only
+            intentResponse = chat(
+                model='mistral:7b',
+                options={"temperature": 0},
+                messages=[
+                    {'role': 'system', 'content': INTENT_PROMPT},
+                    {'role': 'user', 'content': prompt}
+                ]
+            )
+
+            try:
+                intent = json.loads(intentResponse['message']['content'])
+                action = intent.get("action")
+                target = intent.get("target")
+
+                if action == "open_app" and target in APPS:
+                    print(f"Opening {target}...")
+                    os.startfile(APPS[target])
+
+                elif action == "clip":
+                    keyboard.send("left_alt + f10")
+
+                elif action == "screen_share":
+                    keyboard.send('shift+l+p')
+
+                elif action == "open_settings":
+                    open_menu()
+
+                elif action == "exit":
+                    print("Returning to wake word detection...")
+
+            except json.JSONDecodeError:
+                print("Intent parse failed, skipping action")
+
+            overlay.hide()
             STATE = "WAKE"
         
-            # OPENS APPS in the APP LIST
-            if "open" in prompt.lower():
-                for app in APPS:
-                    if app in prompt.lower():
-                        print(f"Opening {app}...")
-                        os.startfile(APPS[app])
-                        
-                        STATE = "WAKE"
-                        continue
-                        
-            # KeyPress LALT + F10 activating Nvidia Shadowplay
-            if "clip" in prompt.lower() and "this" in prompt.lower():
-                keyboard.send("left_alt + f10")
-
-            # Keypress LSHIFT+L+P enabling ScreenShare (only in games where Discord sees)
-            if "screen" in prompt.lower() and "share" in prompt.lower():
-                keyboard.send('shift+l+p')
-
-            # RETURN TO CONSOLE IF WORDS IN PROMPT (KINDA USELESS FOR NOW SINCE IM THINKING ON GOING ALWAYS TO ACTIVATE FOR NEXT INPUT)
-            if any(word in prompt.lower() for word in EXIT_KEYWORDS):
-                print("Returning to wake word detection...")
-                STATE = "WAKE"
-            overlay.hide()
+            ## OPENS APPS in the APP LIST
+            #if "open" in prompt.lower():
+            #    for app in APPS:
+            #        if app in prompt.lower():
+            #            print(f"Opening {app}...")
+            #            os.startfile(APPS[app])
+            #            
+            #            STATE = "WAKE"
+            #            continue
+            #            
+            ## KeyPress LALT + F10 activating Nvidia Shadowplay
+            #if "clip" in prompt.lower() and "this" in prompt.lower():
+            #    keyboard.send("left_alt + f10")
+#
+            ## Keypress LSHIFT+L+P enabling ScreenShare (only in games where Discord sees)
+            #if "screen" in prompt.lower() and "share" in prompt.lower():
+            #    keyboard.send('shift+l+p')
+            #if "open" in prompt.lower() and "setting" in prompt.lower():
+            #    open_menu(None, None)
+#
+            #if any(word in prompt.lower() for word in EXIT_KEYWORDS):
+            #    print("Returning to wake word detection...")
+            #    STATE = "WAKE"
+            #overlay.hide()
         else:
             overlay.hide()
 
