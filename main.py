@@ -212,7 +212,8 @@ try:
             print("\nYou said:", prompt)
             
             aiResponse = chat(
-                model='mistral:7b',
+                #DESKTOP mistral:7b, LAPTOP tinylamma
+                model='tinyllama',
                 messages=[
                     {'role': 'system', 'content': SYSTEM_PROMPT},
                     {'role': 'user', 'content': prompt}
