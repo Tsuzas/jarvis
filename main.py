@@ -8,6 +8,135 @@ import asyncio
 import keyboard
 import edge_tts
 import threading
+from typer import launch
+import webrtcvad
+import numpy as np
+import openwakeword
+import tkinter as tk
+from ollama import chat
+from PIL import Image, ImageTk
+from openwakeword.model import Model
+from faster_whisper import WhisperModel
+
+# Download models on first run 
+openwakeword.utils.download_models()
+
+# VAD aggressiveness 0-3
+vad = webrtcvad.Vad(3)
+CHUNK = 480
+first_boot= True
+
+
+class OverlayWindow:
+    def __init__(self, image_path):
+        self.image_path = image_path
+        self.root = None
+        self.ready = threading.Event()
+        self.thread = threading.Thread(target=self._run, daemon=True)
+        self.thread.start()
+        self.ready.wait()
+
+    def _run(self):
+        self.root = tk.Tk()
+        self.root.overrideredirect(True)
+        self.root.wm_attributes("-topmost", True)
+        self.root.wm_attributes("-transparentcolor", "black")
+        self.root.configure(bg="black")
+
+        # Load all frames from the GIF
+        gif = Image.open(self.image_path)
+        self.frames = []
+        try:
+            while True:
+                frame = gif.copy().convert("RGBA").resize((200, 200))
+                self.frames.append(ImageTk.PhotoImage(frame))
+                gif.seek(gif.tell() + 1)
+        except EOFError:
+            pass
+
+        self.label = tk.Label(self.root, bg="black")
+        self.label.pack()
+        self.root.geometry(f"+{self.root.winfo_screenwidth()-220}+{self.root.winfo_screenheight()-240}")
+        self.root.withdraw()
+        self.ready.set()
+
+        self._animate(0)
+        self.root.mainloop()
+
+    def _animate(self, frame_index):
+        if self.frames:
+            self.label.config(image=self.frames[frame_index])
+            next_frame = (frame_index + 1) % len(self.frames)
+            self.root.after(50, self._animate, next_frame)  # 50ms per frame (~20fps)
+
+    def show(self):
+        if self.root:
+            self.root.deiconify()
+
+    def hide(self):
+        if self.root:
+            self.root.withdraw()
+
+async def bootAudio(first_boot):
+    import random
+    GREETINGS = ["How can I help?", "Voice input active.", "Systems operational.",
+        "Assistant ready.", "What do you need?", "Connected.",
+        "Ready for commands.", "Session started.",
+        "Microphone active.", "Processing.", "Command ready.",
+        "Good evening. I've lowered my expectations appropriately.",
+        "I exist purely because typing is annoying.",
+        "Systems online. Standards offline.", "Fantastic. More debugging.",
+        "I assume we're doing something unnecessary but interesting.","Voice systems active.",
+        "Welcome back. What are we working on today?", "Ready when you are.",
+        "Hey. What can I do for you?", "Welcome back. What code are we breaking today?"
+    ]
+    REGREETS = ["Ready.", "Operational.", "I'm here.", "Back again?",
+                "Online.", "Listening.", "Awaiting input.",
+                "Standing by.", "Input detected.", "Initialized."
+    ]
+    
+    if first_boot:
+        greeting = random.choice(GREETINGS)
+    else:
+        greeting = random.choice(REGREETS)
+    print(greeting)
+    communicate = edge_tts.Communicate(greeting, "en-GB-RyanNeural", rate="+40%")
+    await communicate.save("BootAudio.mp3")
+    pygame.mixer.music.load("BootAudio.mp3")
+    pygame.mixer.music.play()
+    while pygame.mixer.music.get_busy():
+        await asyncio.sleep(0.05)
+    pygame.mixer.music.unload()
+
+def clean_for_tts(text):
+
+    text = re.sub(r"```.*?```", "Code example available in console.", text, flags=re.DOTALL)
+    text = re.sub(r"`(.*?)`", r"\1", text)
+    text = re.sub(r"https?://\S+", "link omitted.", text)
+    
+    return text
+
+async def speak(text):
+    communicate = edge_tts.Communicate(text, "en-GB-RyanNeural", rate="+40%")
+    await communicate.save("output.mp3")
+    pygame.mixer.music.load("output.mp3")
+    pygame.mixer.music.play()
+    while pygame.mixer.music.get_busy():
+        await asyncio.sleep(0.05)
+    pygame.mixer.music.unload()
+    os.remove("output.mp3")
+
+import os
+import re
+import time
+import wave
+import pygame
+import pyaudio
+import asyncio
+import keyboard
+import edge_tts
+import threading
+from typer import launch
 import webrtcvad
 import numpy as np
 import openwakeword
@@ -126,20 +255,83 @@ async def speak(text):
     os.remove("output.mp3")
 
 def create_tray_icon():
-    from PIL import Image
     import pystray
 
     def on_quit(icon, item):
         icon.stop()
         os._exit(0)
 
-    image = Image.open("media/tray_icon.png")
-    menu = pystray.Menu(pystray.MenuItem("Quit", on_quit))
-    icon = pystray.Icon("Jarvis", image, "Jarvis Assistant", menu)
-    #icon.on_click += lambda _: show_message('Clicked!')
-    #icon.on_menu_item += on_menu_item
-    threading.Thread(target=icon.run, daemon=True).start()
+    def open_menu(icon, item):
+        def launch():
+            settings = tk.Toplevel()
+            settings.title("Jarvis Settings")
+            settings.geometry("500x400")
+            settings.resizable(False, False)
+            settings.attributes("-topmost", True)
 
+            tk.Label(settings, text="Jarvis Assistant", font=("Arial", 14, "bold")).pack(pady=10)
+            tk.Label(settings, text="App Name       |       App Path").pack()
+
+            rows = []  # stores (name_entry, path_entry) per row
+
+            frame = tk.Frame(settings)
+            frame.pack(pady=5)
+
+            def add_row(name="", path=""):
+                row_frame = tk.Frame(frame)
+                row_frame.pack(pady=2)
+
+                name_entry = tk.Entry(row_frame, width=12)
+                name_entry.insert(0, name)
+                name_entry.pack(side="left", padx=5)
+
+                path_entry = tk.Entry(row_frame, width=40)
+                path_entry.insert(0, path)
+                path_entry.pack(side="left", padx=5)
+
+                rows.append((name_entry, path_entry))
+
+                # When user types in the last empty row, add a new empty one
+                def on_type(event):
+                    if rows and rows[-1] == (name_entry, path_entry):
+                        if name_entry.get().strip() or path_entry.get().strip():
+                            add_row()
+
+                name_entry.bind("<KeyRelease>", on_type)
+                path_entry.bind("<KeyRelease>", on_type)
+
+            # Populate existing apps
+            for app_name, app_path in APPS.items():
+                add_row(app_name, app_path)
+
+            # Extra empty row at the end
+            add_row()
+
+            def save():
+                APPS.clear()
+                for name_entry, path_entry in rows:
+                    name = name_entry.get().strip()
+                    path = path_entry.get().strip()
+                    if name and path:  # skip empty rows
+                        APPS[name] = path
+                print("APPS updated:", APPS)
+                settings.destroy()
+
+            tk.Button(settings, text="Save", width=20, command=save).pack(pady=10)
+            tk.Button(settings, text="Close", width=20, command=settings.destroy).pack()
+    
+            settings.mainloop()
+
+        threading.Thread(target=launch, daemon=True).start()
+
+    image = Image.open("media/tray_icon.png")
+    menu = pystray.Menu(
+        pystray.MenuItem("Settings", open_menu),
+        pystray.MenuItem("Quit", on_quit)
+    )
+    icon = pystray.Icon("Jarvis", image, "Jarvis Assistant", menu)
+    threading.Thread(target=icon.run, daemon=True).start()
+    
 # POSSIBILY IMPLEMENTED IN THE FUTURE
 #def is_loud_enough(frame, threshold=1000):
 #    audio = np.frombuffer(frame, dtype=np.int16)
@@ -323,7 +515,7 @@ try:
             overlay.hide()
         else:
             overlay.hide()
-\
+
 finally:
     stream.stop_stream()
     stream.close()
