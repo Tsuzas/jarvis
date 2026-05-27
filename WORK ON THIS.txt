@@ -1,0 +1,13 @@
+1. Floating PNG Overlay (tkinter)
+Use tkinter with -topmost and transparency. It runs in a background thread so it doesn't block your main loop.
+pythonimport tkinter as tk
+from PIL import Image, ImageTk
+import threading
+
+
+Tip: If your PNG has a transparent background, set transparentcolor to whatever solid background color the image has (e.g. "white"), or use a proper RGBA PNG and composite it over a solid key color.
+
+
+Putting It Together — State Flow
+STATEOverlayTrayWAKE (idle)HiddenVisible in trayLISTENShow PNG—PROCESSShow PNG (or swap to a "thinking" gif)—Back to WAKEHide—
+You can even swap between two images (listening vs thinking) by calling self.label.config(image=new_img) on the overlay label.

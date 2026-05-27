@@ -1,5 +1,3 @@
-##ADICIONAR JARVIS CLIPS THIS QUE DA PROC AO NVIDIA F10
-## VER COMO E QUE SCREENSHARE NO DISCORD FUNCIONARIA
 import os
 import re
 import time
@@ -9,10 +7,13 @@ import pyaudio
 import asyncio
 import keyboard
 import edge_tts
+import threading
 import webrtcvad
 import numpy as np
 import openwakeword
+import tkinter as tk
 from ollama import chat
+from PIL import Image, ImageTk
 from openwakeword.model import Model
 from faster_whisper import WhisperModel
 
@@ -23,6 +24,57 @@ openwakeword.utils.download_models()
 vad = webrtcvad.Vad(3)
 CHUNK = 480
 first_boot= True
+
+
+class OverlayWindow:
+    def __init__(self, image_path):
+        self.image_path = image_path
+        self.root = None
+        self.ready = threading.Event()
+        self.thread = threading.Thread(target=self._run, daemon=True)
+        self.thread.start()
+        self.ready.wait()
+
+    def _run(self):
+        self.root = tk.Tk()
+        self.root.overrideredirect(True)
+        self.root.wm_attributes("-topmost", True)
+        self.root.wm_attributes("-transparentcolor", "black")
+        self.root.configure(bg="black")
+
+        # Load all frames from the GIF
+        gif = Image.open(self.image_path)
+        self.frames = []
+        try:
+            while True:
+                frame = gif.copy().convert("RGBA").resize((200, 200))
+                self.frames.append(ImageTk.PhotoImage(frame))
+                gif.seek(gif.tell() + 1)
+        except EOFError:
+            pass
+
+        self.label = tk.Label(self.root, bg="black")
+        self.label.pack()
+        self.root.geometry(f"+{self.root.winfo_screenwidth()-220}+{self.root.winfo_screenheight()-240}")
+        self.root.withdraw()
+        self.ready.set()
+
+        self._animate(0)
+        self.root.mainloop()
+
+    def _animate(self, frame_index):
+        if self.frames:
+            self.label.config(image=self.frames[frame_index])
+            next_frame = (frame_index + 1) % len(self.frames)
+            self.root.after(50, self._animate, next_frame)  # 50ms per frame (~20fps)
+
+    def show(self):
+        if self.root:
+            self.root.deiconify()
+
+    def hide(self):
+        if self.root:
+            self.root.withdraw()
 
 async def bootAudio(first_boot):
     import random
@@ -73,6 +125,21 @@ async def speak(text):
     pygame.mixer.music.unload()
     os.remove("output.mp3")
 
+def create_tray_icon():
+    from PIL import Image
+    import pystray
+
+    def on_quit(icon, item):
+        icon.stop()
+        os._exit(0)
+
+    image = Image.open("media/tray_icon.png")
+    menu = pystray.Menu(pystray.MenuItem("Quit", on_quit))
+    icon = pystray.Icon("Jarvis", image, "Jarvis Assistant", menu)
+    #icon.on_click += lambda _: show_message('Clicked!')
+    #icon.on_menu_item += on_menu_item
+    threading.Thread(target=icon.run, daemon=True).start()
+
 # POSSIBILY IMPLEMENTED IN THE FUTURE
 #def is_loud_enough(frame, threshold=1000):
 #    audio = np.frombuffer(frame, dtype=np.int16)
@@ -113,6 +180,8 @@ os.environ["PATH"] += os.pathsep + r"C:\ffmpeg\bin"
 pygame.mixer.init()
 loop = asyncio.new_event_loop()
 asyncio.set_event_loop(loop)
+overlay = OverlayWindow("media/Haunter.gif")
+create_tray_icon()
 
 STATE = "WAKE"
 OUTPUT_FILENAME = "recordedAudio.wav"
@@ -161,6 +230,7 @@ stream = audio.open(
 )
 
 loop.run_until_complete(bootAudio(first_boot=True))
+
 print("Listening for 'Hey Jarvis'...")
 
 try:
@@ -174,7 +244,7 @@ try:
             if prediction["hey_jarvis"] > 0.5:
                 print("Hey Jarvis detected!")
                 oww_model.reset()
-
+                overlay.show()
                 STATE = "LISTEN"
                 loop.run_until_complete(bootAudio(first_boot=False))
 
@@ -213,7 +283,7 @@ try:
             
             aiResponse = chat(
                 #DESKTOP mistral:7b, LAPTOP tinylamma
-                model='tinyllama',
+                model='mistral:7b',
                 messages=[
                     {'role': 'system', 'content': SYSTEM_PROMPT},
                     {'role': 'user', 'content': prompt}
@@ -234,6 +304,7 @@ try:
                     if app in prompt.lower():
                         print(f"Opening {app}...")
                         os.startfile(APPS[app])
+                        
                         STATE = "WAKE"
                         continue
                         
@@ -241,7 +312,7 @@ try:
             if "clip" in prompt.lower() and "this" in prompt.lower():
                 keyboard.send("left_alt + f10")
 
-            # Keypress LSHIFT+L+P enabling ScreenShare (only is games where Discord sees)
+            # Keypress LSHIFT+L+P enabling ScreenShare (only in games where Discord sees)
             if "screen" in prompt.lower() and "share" in prompt.lower():
                 keyboard.send('shift+l+p')
 
@@ -249,9 +320,10 @@ try:
             if any(word in prompt.lower() for word in EXIT_KEYWORDS):
                 print("Returning to wake word detection...")
                 STATE = "WAKE"
+            overlay.hide()
         else:
-            STATE = "WAKE"
-
+            overlay.hide()
+\
 finally:
     stream.stop_stream()
     stream.close()

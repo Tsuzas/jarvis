@@ -6,6 +6,8 @@ ollama
 faster-whisper
 openwakeword
 webrtcvad
+pillow
+pystray
 
 # WINDOWS
 # py -3.11 -m venv venv
