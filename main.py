@@ -387,7 +387,6 @@ try:
             # second call - intent only
             intentResponse = chat(
                 model='mistral:7b',
-                options={"temperature": 0},
                 messages=[
                     {'role': 'system', 'content': INTENT_PROMPT},
                     {'role': 'user', 'content': prompt}
