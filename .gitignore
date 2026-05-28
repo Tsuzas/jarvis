@@ -24900,3 +24900,6 @@ venv/Lib/site-packages/six-1.17.0.dist-info/METADATA
 venv/Lib/site-packages/six-1.17.0.dist-info/RECORD
 venv/Lib/site-packages/six-1.17.0.dist-info/top_level.txt
 venv/Lib/site-packages/six-1.17.0.dist-info/WHEEL
+config.json
+secondaryPy's/groq.py
+secondaryPy's/ClaudeWIP.py

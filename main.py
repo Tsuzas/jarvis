@@ -209,12 +209,6 @@ def open_menu(icon, item):
 
     threading.Thread(target=launch, daemon=True).start()    
 
-
-# POSSIBILY IMPLEMENTED IN THE FUTURE
-#def is_loud_enough(frame, threshold=1000):
-#    audio = np.frombuffer(frame, dtype=np.int16)
-#    return np.abs(audio).mean() > threshold
-
 def record_until_silence(stream):
     frames = []
     silent_chunks = 0
@@ -299,7 +293,7 @@ Examples:
 "share my screen" -> {"action": "screen_share", "target": null}
 "open settings" -> {"action": "open_settings", "target": null}
 "goodbye" -> {"action": "exit", "target": null}
-"what is the weather" -> {"action": "none", "target": null}
+
 
 Return ONLY the JSON. No explanation. No markdown.
 """
@@ -338,8 +332,8 @@ try:
 
 
         elif STATE == "LISTEN":
-            frames = record_until_silence(stream)
             pygame.mixer.Sound("audio/Palumm.mp3").play()
+            frames = record_until_silence(stream)
 
             if not frames or len(frames) < 15:
                 print("Ignored audio")
