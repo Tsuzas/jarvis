@@ -102,7 +102,7 @@ async def bootAudio(first_boot):
     else:
         greeting = random.choice(REGREETS)
     print(greeting)
-    communicate = edge_tts.Communicate(greeting, "en-GB-RyanNeural", rate="+40%")
+    communicate = edge_tts.Communicate(greeting, "en-GB-RyanNeural", rate="+35%")
     await communicate.save("BootAudio.mp3")
     pygame.mixer.music.load("BootAudio.mp3")
     pygame.mixer.music.play()
@@ -124,6 +124,9 @@ async def speak(text):
     pygame.mixer.music.load("output.mp3")
     pygame.mixer.music.play()
     while pygame.mixer.music.get_busy():
+        if keyboard.is_pressed("esc"):  # Cancel speech on ESC key
+            pygame.mixer.music.stop()
+            break
         await asyncio.sleep(0.05)
     pygame.mixer.music.unload()
     os.remove("output.mp3")
@@ -335,8 +338,8 @@ try:
 
 
         elif STATE == "LISTEN":
-            pygame.mixer.Sound("audio/Palumm.mp3").play()
             frames = record_until_silence(stream)
+            pygame.mixer.Sound("audio/Palumm.mp3").play()
 
             if not frames or len(frames) < 15:
                 print("Ignored audio")
@@ -407,7 +410,7 @@ try:
                     keyboard.send('shift+l+p')
 
                 elif action == "open_settings":
-                    open_menu()
+                    open_menu(None, None)
 
                 elif action == "exit":
                     print("Returning to wake word detection...")
@@ -417,31 +420,7 @@ try:
 
             overlay.hide()
             STATE = "WAKE"
-        
-            ## OPENS APPS in the APP LIST
-            #if "open" in prompt.lower():
-            #    for app in APPS:
-            #        if app in prompt.lower():
-            #            print(f"Opening {app}...")
-            #            os.startfile(APPS[app])
-            #            
-            #            STATE = "WAKE"
-            #            continue
-            #            
-            ## KeyPress LALT + F10 activating Nvidia Shadowplay
-            #if "clip" in prompt.lower() and "this" in prompt.lower():
-            #    keyboard.send("left_alt + f10")
-#
-            ## Keypress LSHIFT+L+P enabling ScreenShare (only in games where Discord sees)
-            #if "screen" in prompt.lower() and "share" in prompt.lower():
-            #    keyboard.send('shift+l+p')
-            #if "open" in prompt.lower() and "setting" in prompt.lower():
-            #    open_menu(None, None)
-#
-            #if any(word in prompt.lower() for word in EXIT_KEYWORDS):
-            #    print("Returning to wake word detection...")
-            #    STATE = "WAKE"
-            #overlay.hide()
+    
         else:
             overlay.hide()
 
