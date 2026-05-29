@@ -10,7 +10,6 @@ import asyncio
 import keyboard
 import edge_tts
 import threading
-#from typer import launch
 import webrtcvad
 import numpy as np
 import openwakeword
