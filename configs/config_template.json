@@ -1,0 +1,13 @@
+{
+    "apps": {
+        "brave": "",
+        "visual studio code": "",
+        "steam": "",
+        "programming": ""
+    },
+    "microphone_index": 1, 
+    "ffmpeg_path": "",
+    "tts_voice": "en-GB-RyanNeural",
+    "tts_rate": "+40%",
+    "model": "mistral:7b"
+}

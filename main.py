@@ -19,6 +19,10 @@ from PIL import Image, ImageTk
 from openwakeword.model import Model
 from faster_whisper import WhisperModel
 
+# IMPORTS all config variables from config.py 
+import configs.config as confs
+
+
 # Download models on first run 
 openwakeword.utils.download_models()
 
@@ -28,6 +32,7 @@ CHUNK = 480
 first_boot= True
 
 
+# OverlayWindow Create and abused by AI :)
 class OverlayWindow:
     def __init__(self, image_path):
         self.image_path = image_path
@@ -80,30 +85,16 @@ class OverlayWindow:
 
 async def bootAudio(first_boot):
     import random
-    GREETINGS = ["How can I help?", "Voice input active.", "Systems operational.",
-        "Assistant ready.", "What do you need?", "Connected.",
-        "Ready for commands.", "Session started.",
-        "Microphone active.", "Processing.", "Command ready.",
-        "Good evening. I've lowered my expectations appropriately.",
-        "I exist purely because typing is annoying.",
-        "Systems online. Standards offline.", "Fantastic. More debugging.",
-        "I assume we're doing something unnecessary but interesting.","Voice systems active.",
-        "Welcome back. What are we working on today?", "Ready when you are.",
-        "Hey. What can I do for you?", "Welcome back. What code are we breaking today?"
-    ]
-    REGREETS = ["Ready.", "Operational.", "I'm here.", "Back again?",
-                "Online.", "Listening.", "Awaiting input.",
-                "Standing by.", "Input detected.", "Initialized."
-    ]
+    
     
     if first_boot:
-        greeting = random.choice(GREETINGS)
+        greeting = random.choice(confs.GREETINGS)
     else:
-        greeting = random.choice(REGREETS)
+        greeting = random.choice(confs.REGREETS)
     print(greeting)
     communicate = edge_tts.Communicate(greeting, "en-GB-RyanNeural", rate="+35%")
-    await communicate.save("BootAudio.mp3")
-    pygame.mixer.music.load("BootAudio.mp3")
+    await communicate.save("audio/BootAudio.mp3")
+    pygame.mixer.music.load("audio/BootAudio.mp3")
     pygame.mixer.music.play()
     while pygame.mixer.music.get_busy():
         await asyncio.sleep(0.05)
@@ -119,8 +110,8 @@ def clean_for_tts(text):
 
 async def speak(text):
     communicate = edge_tts.Communicate(text, "en-GB-RyanNeural", rate="+40%")
-    await communicate.save("output.mp3")
-    pygame.mixer.music.load("output.mp3")
+    await communicate.save(confs.OUTPUT_FILENAME)
+    pygame.mixer.music.load(confs.OUTPUT_FILENAME)
     pygame.mixer.music.play()
     while pygame.mixer.music.get_busy():
         if keyboard.is_pressed("esc"):  # Cancel speech on ESC key
@@ -128,7 +119,7 @@ async def speak(text):
             break
         await asyncio.sleep(0.05)
     pygame.mixer.music.unload()
-    os.remove("output.mp3")
+    os.remove(confs.OUTPUT_FILENAME)
 
 def create_tray_icon():
     import pystray
@@ -185,20 +176,20 @@ def open_menu(icon, item):
             path_entry.bind("<KeyRelease>", on_type)
 
         # Populate existing apps
-        for app_name, app_path in APPS.items():
+        for app_name, app_path in confs.APPS.items():
             add_row(app_name, app_path)
 
         # Extra empty row at the end
         add_row()
 
         def save():
-            APPS.clear()
+            confs.APPS.clear()
             for name_entry, path_entry in rows:
                 name = name_entry.get().strip()
                 path = path_entry.get().strip()
                 if name and path:  # skip empty rows
-                    APPS[name] = path
-            print("APPS updated:", APPS)
+                    confs.APPS[name] = path
+            print("APPS updated:", confs.APPS)
             settings.destroy()
 
         tk.Button(settings, text="Save", width=20, command=save).pack(pady=10)
@@ -247,55 +238,7 @@ overlay = OverlayWindow("media/Haunter.gif")
 create_tray_icon()
 
 STATE = "WAKE"
-OUTPUT_FILENAME = "recordedAudio.wav"
-APPS = {
-    "brave": r"C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Brave.lnk",
-    "code": r"C:\Users\fpere\Desktop\Code - Shortcut.lnk",
-    "steam": r"C:\Users\fpere\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Steam\Steam.lnk"
-}
-EXIT_KEYWORDS = ["goodbye", "bye", "exit", "quit", "stop", "see you", "take care", "farewell", "close"]
-SYSTEM_PROMPT = ("""
-You are a fast conversational voice assistant.
 
-Use a natural, human-friendly tone.
-Keep replies short and conversational.
-Reply in 1-3 sentences unless the user asks for more.
-
-You are being spoken to, not typed to.
-Avoid markdown, bullet points, lists, and emojis.
-
-Always reply in English.
-
-If the user clearly ends the conversation, reply with only a short farewell.
-
-If the user requests an application, website, or file to be opened, reply only:
-'Opening <thing>...'
-
-If the user requests something to be clipped or captured, reply only:
-'Clipped!' variants.
-
-If the user request for the screen to be shared, reply only: 'On it' or 'Enabling Screen Share' variants.
-"""
-)
-INTENT_PROMPT = """
-You are an intent classifier for a voice assistant.
-
-Given a user message, return ONLY a JSON object like this:
-{
-  "action": "open_app" | "clip" | "screen_share" | "open_settings" | "exit" | "none",
-  "target": "app name or null"
-}
-
-Examples:
-"open brave" -> {"action": "open_app", "target": "brave"}
-"clip that" -> {"action": "clip", "target": null}
-"share my screen" -> {"action": "screen_share", "target": null}
-"open settings" -> {"action": "open_settings", "target": null}
-"goodbye" -> {"action": "exit", "target": null}
-
-
-Return ONLY the JSON. No explanation. No markdown.
-"""
 ## OPENWAKEWORD + PYAUDIO + WHISPER SETUP
 oww_model = Model(wakeword_models=["hey_jarvis"], inference_framework="onnx")
 whisper_model = WhisperModel("base.en", device="cpu", compute_type="int8")
@@ -307,7 +250,7 @@ stream = audio.open(
     rate=16000,
     input=True,
     frames_per_buffer= CHUNK,
-    input_device_index=4
+    input_device_index=3
 )
 
 loop.run_until_complete(bootAudio(first_boot=True))
@@ -331,7 +274,7 @@ try:
 
 
         elif STATE == "LISTEN":
-            pygame.mixer.Sound("audio/Palumm.mp3").play()
+            pygame.mixer.Sound("audio/dings/Palumm.mp3").play()
             frames = record_until_silence(stream)
 
             if not frames or len(frames) < 15:
@@ -340,8 +283,9 @@ try:
                 continue
 
             audio_bytes = b"".join(frames)
-
-            wf = wave.open(OUTPUT_FILENAME, 'wb')
+            audio_np = np.frombuffer(audio_bytes, dtype=np.int16)
+            audio_np = audio_np.astype(np.float32) / 32768.0    
+            wf = wave.open(confs.OUTPUT_FILENAME, 'wb')
             wf.setnchannels(1)
             wf.setsampwidth(audio.get_sample_size(pyaudio.paInt16))
             wf.setframerate(16000)
@@ -352,7 +296,7 @@ try:
 
 
         elif STATE == "PROCESS":
-            segments, _ = whisper_model.transcribe(OUTPUT_FILENAME)
+            segments, _ = whisper_model.transcribe(confs.OUTPUT_FILENAME)
             prompt = " ".join(s.text for s in segments)
             prompt = prompt.strip()
 
@@ -362,11 +306,49 @@ try:
                 continue
             print("\nYou said:", prompt)
             
+
+            # second call - intent only
+            intentResponse = chat(
+                model='mistral:7b',
+                messages=[
+                    {'role': 'system', 'content': confs.INTENT_PROMPT},
+                    {'role': 'user', 'content': prompt}
+                ]
+            )
+            raw = intentResponse.get("message", {}).get("content", "")
+            print ("Raw intent response:", raw)
+            try:
+                intent = json.loads(raw)
+            except json.JSONDecodeError:
+                print("Invalid model output:", raw)
+                intent = {}
+
+            action = intent.get("action")
+            target = intent.get("target")
+
+            print("Intent detected:", action, "Target:", target)
+
+            if action == "open_app" and target in confs.APPS:
+                print(f"Opening {target}...")
+                os.startfile(confs.APPS[target])
+
+            elif action == "clip":
+                keyboard.send("left_alt + f10")
+
+            elif action == "screen_share":
+                keyboard.send('shift+l+p')
+
+            elif action == "open_settings":
+                open_menu(None, None)
+
+            elif action == "exit":
+                print("Returning to wake word detection...")
+
             aiResponse = chat(
                 #DESKTOP mistral:7b, LAPTOP tinylamma
                 model='mistral:7b',
                 messages=[
-                    {'role': 'system', 'content': SYSTEM_PROMPT},
+                    {'role': 'system', 'content': confs.SYSTEM_PROMPT},
                     {'role': 'user', 'content': prompt}
                 ]
             )
@@ -377,38 +359,6 @@ try:
             cleaned_text = clean_for_tts(response_text)
             #CLEANSED TEXT TTS'ed
             loop.run_until_complete(speak(cleaned_text))
-            # second call - intent only
-            intentResponse = chat(
-                model='mistral:7b',
-                messages=[
-                    {'role': 'system', 'content': INTENT_PROMPT},
-                    {'role': 'user', 'content': prompt}
-                ]
-            )
-
-            try:
-                intent = json.loads(intentResponse['message']['content'])
-                action = intent.get("action")
-                target = intent.get("target")
-
-                if action == "open_app" and target in APPS:
-                    print(f"Opening {target}...")
-                    os.startfile(APPS[target])
-
-                elif action == "clip":
-                    keyboard.send("left_alt + f10")
-
-                elif action == "screen_share":
-                    keyboard.send('shift+l+p')
-
-                elif action == "open_settings":
-                    open_menu(None, None)
-
-                elif action == "exit":
-                    print("Returning to wake word detection...")
-
-            except json.JSONDecodeError:
-                print("Intent parse failed, skipping action")
 
             overlay.hide()
             STATE = "WAKE"

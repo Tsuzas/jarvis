@@ -1,7 +1,14 @@
+#Virtual environment
 venv/*
-secondaryPy's/ClaudeWIP.py
-secondaryPy's/groq.py
+#Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+#Personal Config File, resort to Template, remove _Template suffix and fill in the values
 config.json
-BootAudio.mp3
-Output.mp3
-recordedAudio.wav
+config.py
+
+#Audio Files, they are being deleted, just as failsafe, so they are not needed in the repo
+audio/*.wave
+audio/*.mp3

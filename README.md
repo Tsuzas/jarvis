@@ -66,3 +66,11 @@ pip install -r requirements.txt
 - Possibly allow manual selection of which microphone to use instead of index
 - Move on from tkinter to a more solid UI
 - Optimize flow with the goal of User to text to ai to TTs to user to be seamless
+
+## Known Bugs
+
+### Multi-action intent execution
+- Due to intention prompt, bad structuring of intent, action and by not handling arrays properly, we cannot open multiple apps at the same time as in previous versions. Will work on in the future.
+
+### Tkinter threading instability
+- Some illegal coding in in the creation of tkinter causing erros in threading. This occurs because Tkinter is being accessed outside the main thread. Its holding on by a ... thread, will be fixed when refactor into ui.py or another UI library
