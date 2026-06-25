@@ -19,8 +19,11 @@ from PIL import Image, ImageTk
 from openwakeword.model import Model
 from faster_whisper import WhisperModel
 
-# IMPORTS all config variables from config.py 
-import configs.config as confs
+
+# IMPORTS all config variables from config.json
+with open("configs/config.json", "r", encoding="utf-8") as f:
+    config = json.load(f)
+
 
 
 # Download models on first run 
@@ -88,11 +91,11 @@ async def bootAudio(first_boot):
     
     
     if first_boot:
-        greeting = random.choice(confs.GREETINGS)
+        greeting = random.choice(config["GREETINGS"])
     else:
-        greeting = random.choice(confs.REGREETS)
+        greeting = random.choice(config["REGREETS"])
     print(greeting)
-    communicate = edge_tts.Communicate(greeting, "en-GB-RyanNeural", rate="+35%")
+    communicate = edge_tts.Communicate(greeting, config["TTS_VOICE"], rate=config["TTS_RATE"])
     await communicate.save("audio/BootAudio.mp3")
     pygame.mixer.music.load("audio/BootAudio.mp3")
     pygame.mixer.music.play()
@@ -109,9 +112,9 @@ def clean_for_tts(text):
     return text
 
 async def speak(text):
-    communicate = edge_tts.Communicate(text, "en-GB-RyanNeural", rate="+40%")
-    await communicate.save(confs.OUTPUT_FILENAME)
-    pygame.mixer.music.load(confs.OUTPUT_FILENAME)
+    communicate = edge_tts.Communicate(text, config["TTS_VOICE"], rate=config["TTS_RATE"])
+    await communicate.save(config["OUTPUT_FILENAME"])
+    pygame.mixer.music.load(config["OUTPUT_FILENAME"])
     pygame.mixer.music.play()
     while pygame.mixer.music.get_busy():
         if keyboard.is_pressed("esc"):  # Cancel speech on ESC key
@@ -119,7 +122,7 @@ async def speak(text):
             break
         await asyncio.sleep(0.05)
     pygame.mixer.music.unload()
-    os.remove(confs.OUTPUT_FILENAME)
+    os.remove(config["OUTPUT_FILENAME"])
 
 def create_tray_icon():
     import pystray
@@ -135,7 +138,7 @@ def create_tray_icon():
 def on_quit(icon, item):
         icon.stop()
         os._exit(0)
-def open_menu(icon, item):
+def open_menu():
 
     def launch():
         settings = tk.Toplevel()
@@ -176,20 +179,24 @@ def open_menu(icon, item):
             path_entry.bind("<KeyRelease>", on_type)
 
         # Populate existing apps
-        for app_name, app_path in confs.APPS.items():
+        for app_name, app_path in config["APPS"].items():
             add_row(app_name, app_path)
 
         # Extra empty row at the end
         add_row()
 
         def save():
-            confs.APPS.clear()
+            config["APPS"].clear()
             for name_entry, path_entry in rows:
                 name = name_entry.get().strip()
                 path = path_entry.get().strip()
                 if name and path:  # skip empty rows
-                    confs.APPS[name] = path
-            print("APPS updated:", confs.APPS)
+                    config["APPS"][name] = path
+            print("APPS updated:", config["APPS"])
+
+            with open("configs/config.json", "w", encoding="utf-8") as f:
+                json.dump(config, f, indent=4)
+
             settings.destroy()
 
         tk.Button(settings, text="Save", width=20, command=save).pack(pady=10)
@@ -230,7 +237,7 @@ def record_until_silence(stream):
     return frames
 
 ## SETUP
-os.environ["PATH"] += os.pathsep + r"C:\ffmpeg\bin"
+os.environ["PATH"] += os.pathsep + config["FFMPEG_PATH"]
 pygame.mixer.init()
 loop = asyncio.new_event_loop()
 asyncio.set_event_loop(loop)
@@ -250,7 +257,7 @@ stream = audio.open(
     rate=16000,
     input=True,
     frames_per_buffer= CHUNK,
-    input_device_index=3
+    input_device_index = config["MICROPHONE_INDEX"]
 )
 
 loop.run_until_complete(bootAudio(first_boot=True))
@@ -285,7 +292,7 @@ try:
             audio_bytes = b"".join(frames)
             audio_np = np.frombuffer(audio_bytes, dtype=np.int16)
             audio_np = audio_np.astype(np.float32) / 32768.0    
-            wf = wave.open(confs.OUTPUT_FILENAME, 'wb')
+            wf = wave.open(config["OUTPUT_FILENAME"], 'wb')
             wf.setnchannels(1)
             wf.setsampwidth(audio.get_sample_size(pyaudio.paInt16))
             wf.setframerate(16000)
@@ -296,7 +303,7 @@ try:
 
 
         elif STATE == "PROCESS":
-            segments, _ = whisper_model.transcribe(confs.OUTPUT_FILENAME)
+            segments, _ = whisper_model.transcribe(config["OUTPUT_FILENAME"])
             prompt = " ".join(s.text for s in segments)
             prompt = prompt.strip()
 
@@ -309,9 +316,9 @@ try:
 
             # second call - intent only
             intentResponse = chat(
-                model='mistral:7b',
+                model= config["MODEL"],
                 messages=[
-                    {'role': 'system', 'content': confs.INTENT_PROMPT},
+                    {'role': 'system', 'content': config["INTENT_PROMPT"]},
                     {'role': 'user', 'content': prompt}
                 ]
             )
@@ -328,9 +335,9 @@ try:
 
             print("Intent detected:", action, "Target:", target)
 
-            if action == "open_app" and target in confs.APPS:
+            if action == "open_app" and target in config["APPS"]:
                 print(f"Opening {target}...")
-                os.startfile(confs.APPS[target])
+                os.startfile(config["APPS"][target])
 
             elif action == "clip":
                 keyboard.send("left_alt + f10")
@@ -339,16 +346,16 @@ try:
                 keyboard.send('shift+l+p')
 
             elif action == "open_settings":
-                open_menu(None, None)
+                open_menu()
 
             elif action == "exit":
                 print("Returning to wake word detection...")
 
             aiResponse = chat(
-                #DESKTOP mistral:7b, LAPTOP tinylamma
-                model='mistral:7b',
+                #DESKTOP mistral:7b
+                model = config["MODEL"],
                 messages=[
-                    {'role': 'system', 'content': confs.SYSTEM_PROMPT},
+                    {'role': 'system', 'content': config["SYSTEM_PROMPT"]},
                     {'role': 'user', 'content': prompt}
                 ]
             )

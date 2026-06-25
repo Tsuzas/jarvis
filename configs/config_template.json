@@ -1,13 +1,37 @@
 {
-    "apps": {
-        "brave": "",
-        "visual studio code": "",
-        "steam": "",
-        "programming": ""
-    },
-    "microphone_index": 1, 
-    "ffmpeg_path": "",
-    "tts_voice": "en-GB-RyanNeural",
-    "tts_rate": "+40%",
-    "model": "mistral:7b"
+  "APPS": {
+    "brave": "C:\\Desktop\\Stuff\\Brave.lnk"
+  },
+
+  "EXIT_KEYWORDS": [
+    "goodbye",
+    "bye",
+    "exit"
+  ],
+
+  "SYSTEM_PROMPT": "You are a fast conversational voice assistant.",
+
+  "INTENT_PROMPT": "You are an intent classifier for a voice assistant.",
+
+  "GREETINGS": [
+    "How can I help?",
+    "Voice input active.",
+    "Systems operational."
+  ],
+
+  "REGREETS": [
+    "Ready.",
+    "Operational.",
+    "I'm here.",
+    "Back again?"
+  ],
+
+  "MICROPHONE_INDEX": 1,
+  "FFMPEG_PATH": "YOUR_FFMPEG_PATH_HERE",
+  "TTS_VOICE": "en-GB-RyanNeural",
+  "TTS_RATE": "+0%",
+  "MODEL": "YOUR_MODEL_NAME_HERE",
+  "OUTPUT_FILENAME": "audio/output.mp3"
+
+
 }
