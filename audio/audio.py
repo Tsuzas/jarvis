@@ -2,12 +2,16 @@
 
 import os
 import re
-import pyaudio
+from typing_extensions import Literal
+from faster_whisper import WhisperModel
 import pygame
 import asyncio
+import pyaudio
 import edge_tts
 import keyboard
 import webrtcvad
+from openwakeword.model import Model
+import numpy as np
 from pyaudio import paInt16
 from configs.configs import load_config
 config = load_config()
@@ -96,3 +100,30 @@ def openAudio():
         input_device_index = config["MICROPHONE_INDEX"]
     )
     return audio, stream
+
+def audioProcess(frames):
+    audio_bytes = b"".join(frames)
+    audio_np = np.frombuffer(audio_bytes, dtype=np.int16)
+    audio_np = audio_np.astype(np.float32) / 32768.0
+    return audio_np
+
+def createPrompt(audio_np, whisper_model):
+    segments, _ = whisper_model.transcribe(audio_np)
+    prompt = " ".join(s.text for s in segments)
+    prompt = prompt.strip()
+
+    return prompt
+
+def createWakeWordModel():
+    return Model(wakeword_models=["hey_jarvis"], inference_framework="onnx")
+
+def createWhisperModel(
+    model_size: str = "base.en",
+    device: Literal["cpu", "cuda"] = "cpu",
+    compute_type: Literal["int8", "float16", "np.float32"] = "int8"
+) -> WhisperModel:
+    return WhisperModel(
+        model_size,
+        device=device,
+        compute_type=compute_type
+    )

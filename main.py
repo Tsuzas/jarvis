@@ -10,7 +10,7 @@ import keyboard
 import numpy as np
 import openwakeword
 from ollama import chat
-from openwakeword.model import Model
+
 from faster_whisper import WhisperModel
 
 # IMPORT config and loads it
@@ -24,6 +24,8 @@ import gui.ui as ui
 # Download models on first run 
 openwakeword.utils.download_models()
 
+#GLOBAL STRUFF
+global audio_np
 
 ## SETUP
 os.environ["PATH"] += os.pathsep + config["FFMPEG_PATH"]
@@ -36,9 +38,10 @@ ui.create_tray_icon()
 STATE = "WAKE"
 
 ## OPENWAKEWORD + PYAUDIO + WHISPER SETUP
-oww_model = Model(wakeword_models=["hey_jarvis"], inference_framework="onnx")
-whisper_model = WhisperModel("base.en", device="cpu", compute_type="int8")
+oww_model = audio.createWakeWordModel()
+whisper_model = audio.createWhisperModel()
 
+# 
 audios, stream = audio.openAudio()
 
 loop.run_until_complete(audio.bootAudio(first_boot=True))
@@ -70,23 +73,14 @@ try:
                 STATE = "LISTEN"
                 continue
 
-            audio_bytes = b"".join(frames)
-            audio_np = np.frombuffer(audio_bytes, dtype=np.int16)
-            audio_np = audio_np.astype(np.float32) / 32768.0    
-            wf = wave.open(config["OUTPUT_FILENAME"], 'wb')
-            wf.setnchannels(1)
-            wf.setsampwidth(audios.get_sample_size(pyaudio.paInt16))
-            wf.setframerate(16000)
-            wf.writeframes(audio_bytes)
-            wf.close()
+            audio_np = audio.audioProcess(frames)
 
             STATE = "PROCESS"
 
 
         elif STATE == "PROCESS":
-            segments, _ = whisper_model.transcribe(config["OUTPUT_FILENAME"])
-            prompt = " ".join(s.text for s in segments)
-            prompt = prompt.strip()
+
+            prompt = audio.createPrompt(audio_np, whisper_model)
 
             if not prompt:
                 print("Empty transcription ignored")
