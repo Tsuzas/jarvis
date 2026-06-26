@@ -73,4 +73,4 @@ pip install -r requirements.txt
 - Due to intention prompt, bad structuring of intent, action and by not handling arrays properly, we cannot open multiple apps at the same time as in previous versions. Will work on in the future.
 
 ### Tkinter threading instability
-- Some illegal coding in in the creation of tkinter causing erros in threading. This occurs because Tkinter is being accessed outside the main thread. Its holding on by a ... thread, will be fixed when refactor into ui.py or another UI library
+- Some illegal coding in the creation of tkinter causing erros in threading. This occurs because Tkinter is being accessed outside the main thread. Its holding on by a ... thread, will be fixed when refactor into ui.py or another UI library

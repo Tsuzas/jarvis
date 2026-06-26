@@ -12,9 +12,10 @@ import openwakeword
 from ollama import chat
 from openwakeword.model import Model
 from faster_whisper import WhisperModel
+
+# IMPORT config and loads it
 import configs.configs as configs
 config = configs.load_config()
-
 # IMPORT Audio functions
 import audio.audio as audio
 # IMPORT UI functions
@@ -38,15 +39,7 @@ STATE = "WAKE"
 oww_model = Model(wakeword_models=["hey_jarvis"], inference_framework="onnx")
 whisper_model = WhisperModel("base.en", device="cpu", compute_type="int8")
 
-audios = pyaudio.PyAudio()
-stream = audios.open(
-    format=pyaudio.paInt16,
-    channels=1,
-    rate=16000,
-    input=True,
-    frames_per_buffer= audio.CHUNK,
-    input_device_index = config["MICROPHONE_INDEX"]
-)
+audios, stream = audio.openAudio()
 
 loop.run_until_complete(audio.bootAudio(first_boot=True))
 

@@ -2,12 +2,13 @@
 
 import os
 import re
-import json
+import pyaudio
 import pygame
 import asyncio
 import edge_tts
 import keyboard
 import webrtcvad
+from pyaudio import paInt16
 from configs.configs import load_config
 config = load_config()
     
@@ -83,3 +84,15 @@ def record_until_silence(stream):
             break
                 
     return frames
+
+def openAudio():
+    audio = pyaudio.PyAudio()
+    stream = audio.open(
+        format = pyaudio.paInt16,
+        channels=1,
+        rate=16000,
+        input=True,
+        frames_per_buffer= CHUNK,
+        input_device_index = config["MICROPHONE_INDEX"]
+    )
+    return audio, stream
