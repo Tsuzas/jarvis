@@ -2,17 +2,19 @@
 
 import os
 import re
-from typing_extensions import Literal
-from faster_whisper import WhisperModel
 import pygame
 import asyncio
 import pyaudio
 import edge_tts
 import keyboard
 import webrtcvad
-from openwakeword.model import Model
 import numpy as np
 from pyaudio import paInt16
+from openwakeword.model import Model
+from typing_extensions import Literal
+from faster_whisper import WhisperModel
+
+# IMPORT config and loads it
 from configs.configs import load_config
 config = load_config()
     
@@ -127,3 +129,18 @@ def createWhisperModel(
         device=device,
         compute_type=compute_type
     )
+
+def silenceDetection(frames):
+    if not frames or len(frames) < 15:
+            print("Ignored audio")
+            STATE = "LISTEN"
+
+def chimeSound():
+    pygame.mixer.Sound("audio/dings/Palumm.mp3").play()
+
+def checkTranscription(prompt):
+    if not prompt:
+                print("Empty transcription ignored")
+                STATE = "LISTEN"
+
+    print("\nYou said:", prompt)

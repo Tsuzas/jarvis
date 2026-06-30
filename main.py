@@ -1,10 +1,8 @@
 
 import os
 import time
-import wave
 import json
 import pygame
-import pyaudio
 import asyncio
 import keyboard
 import numpy as np
@@ -28,7 +26,6 @@ openwakeword.utils.download_models()
 global audio_np
 
 ## SETUP
-os.environ["PATH"] += os.pathsep + config["FFMPEG_PATH"]
 pygame.mixer.init()
 loop = asyncio.new_event_loop()
 asyncio.set_event_loop(loop)
@@ -65,13 +62,11 @@ try:
 
 
         elif STATE == "LISTEN":
-            pygame.mixer.Sound("audio/dings/Palumm.mp3").play()
+            audio.chimeSound()
+
             frames = audio.record_until_silence(stream)
 
-            if not frames or len(frames) < 15:
-                print("Ignored audio")
-                STATE = "LISTEN"
-                continue
+            audio.silenceDetection(frames)
 
             audio_np = audio.audioProcess(frames)
 
@@ -82,11 +77,7 @@ try:
 
             prompt = audio.createPrompt(audio_np, whisper_model)
 
-            if not prompt:
-                print("Empty transcription ignored")
-                STATE = "LISTEN"
-                continue
-            print("\nYou said:", prompt)
+            audio.checkTranscription(prompt)
             
 
             # second call - intent only

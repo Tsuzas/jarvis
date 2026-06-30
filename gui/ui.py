@@ -4,6 +4,7 @@ import json
 import threading
 import tkinter as tk
 from PIL import Image, ImageTk
+# IMPORTS config and loads it
 from configs.configs import load_config
 config = load_config()
 
