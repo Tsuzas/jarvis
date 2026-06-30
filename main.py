@@ -7,7 +7,7 @@ import asyncio
 import keyboard
 import numpy as np
 import openwakeword
-from ollama import chat
+
 
 from faster_whisper import WhisperModel
 
@@ -18,6 +18,8 @@ config = configs.load_config()
 import audio.audio as audio
 # IMPORT UI functions
 import gui.ui as ui
+# IMPORT LLM functions
+import ai.llm as llm
 
 # Download models on first run 
 openwakeword.utils.download_models()
@@ -79,52 +81,17 @@ try:
 
             audio.checkTranscription(prompt)
             
-
-            # second call - intent only
-            intentResponse = chat(
-                model= config["MODEL"],
-                messages=[
-                    {'role': 'system', 'content': config["INTENT_PROMPT"]},
-                    {'role': 'user', 'content': prompt}
-                ]
-            )
+            intentResponse = llm.get_intent(prompt)
+            
             raw = intentResponse.get("message", {}).get("content", "")
             print ("Raw intent response:", raw)
-            try:
-                intent = json.loads(raw)
-            except json.JSONDecodeError:
-                print("Invalid model output:", raw)
-                intent = {}
+            
+            intent = llm.jsonify(raw)
 
-            action = intent.get("action")
-            target = intent.get("target")
+            action, target = llm.separate_intent(intent)
+            llm.which_action_and_target(action, target)
 
-            print("Intent detected:", action, "Target:", target)
-
-            if action == "open_app" and target in config["APPS"]:
-                print(f"Opening {target}...")
-                os.startfile(config["APPS"][target])
-
-            elif action == "clip":
-                keyboard.send("left_alt + f10")
-
-            elif action == "screen_share":
-                keyboard.send('shift+l+p')
-
-            elif action == "open_settings":
-                ui.open_menu()
-
-            elif action == "exit":
-                print("Returning to wake word detection...")
-
-            aiResponse = chat(
-                #DESKTOP mistral:7b
-                model = config["MODEL"],
-                messages=[
-                    {'role': 'system', 'content': config["SYSTEM_PROMPT"]},
-                    {'role': 'user', 'content': prompt}
-                ]
-            )
+            aiResponse = llm.get_answer(prompt)
 
             response_text = aiResponse['message']['content']
             print("Jarvis:", response_text)
