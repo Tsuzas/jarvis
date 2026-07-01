@@ -26,7 +26,6 @@ first_boot= True
 async def bootAudio(first_boot):
     import random
     
-    
     if first_boot:
         greeting = random.choice(config["GREETINGS"])
     else:

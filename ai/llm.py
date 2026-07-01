@@ -36,8 +36,8 @@ def jsonify(raw):
 
 def which_action_and_target(action, target):
     if action == "open_app" and target in config["APPS"]:
-                print(f"Opening {target}...")
-                os.startfile(config["APPS"][target])
+        print(f"Opening {target}...")
+        os.startfile(config["APPS"][target])
 
     elif action == "clip":
         keyboard.send("left_alt + f10")
